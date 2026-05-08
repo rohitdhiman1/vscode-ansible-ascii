@@ -212,14 +212,103 @@ function buildTaskBlock(task: TaskNode): FlowBlock[] {
   return [makeFlowBox(lines)];
 }
 
+function describeNodeInline(node: AnsibleNode): string[] {
+  if (node.kind === 'task') {
+    const name = describeTask(node);
+    const mod = node.module ? ` [${shortModule(node.module)}]` : '';
+    const lines = [name + mod];
+    if (node.name && node.module) {
+      const details = describeOperation(node.module, node.moduleArgs);
+      for (const d of details) lines.push(d);
+    }
+    if (node.when) {
+      const whenStr = Array.isArray(node.when) ? node.when.join(' and ') : node.when;
+      lines.push(`when: ${whenStr}`);
+    }
+    if (node.register) lines.push(`register: ${node.register}`);
+    if (node.loop !== undefined) lines.push('loop');
+    if (node.notify?.length) lines.push(`--> notify: ${node.notify.join(', ')}`);
+    return lines;
+  }
+  if (node.kind === 'include') {
+    const target = node.file ?? node.role ?? '?';
+    const lines = [`[${node.type}] ${target}`];
+    if (node.when) {
+      const whenStr = Array.isArray(node.when) ? node.when.join(' and ') : node.when;
+      lines.push(`when: ${whenStr}`);
+    }
+    return lines;
+  }
+  if (node.kind === 'block') {
+    return [`[nested block]${node.name ? ` (${node.name})` : ''}`];
+  }
+  return ['(unknown)'];
+}
+
+function renderNodeTree(nodes: AnsibleNode[]): string[] {
+  const result: string[] = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const isLast = i === nodes.length - 1;
+    const lines = describeNodeInline(nodes[i]);
+    const connector = isLast ? '└─' : '├─';
+    const cont = isLast ? '  ' : '│ ';
+
+    if (i > 0) result.push('│');
+    result.push(`${connector} ${lines[0]}`);
+    for (let j = 1; j < lines.length; j++) {
+      result.push(`${cont} ${lines[j]}`);
+    }
+  }
+  return result;
+}
+
 function buildBlockBlock(block: BlockNode): FlowBlock[] {
-  const header = `[block]${block.name ? ` ${block.name}` : ''}`;
-  return [makeFlowBox([header])];
+  const hasRescue = block.rescue.length > 0;
+  const hasAlways = block.always.length > 0;
+
+  let header: string;
+  if (block.when && !hasRescue && !hasAlways && !block.name) {
+    const whenStr = Array.isArray(block.when) ? block.when.join(' and ') : block.when;
+    header = `when: ${whenStr}`;
+  } else {
+    header = `[block]${block.name ? ` (${block.name})` : ''}`;
+  }
+
+  const boxLines: string[] = [header];
+  if (block.when && (hasRescue || hasAlways || block.name)) {
+    const whenStr = Array.isArray(block.when) ? block.when.join(' and ') : block.when;
+    boxLines.push(`when: ${whenStr}`);
+  }
+
+  const body: string[] = [];
+  body.push('');
+  body.push(...renderNodeTree(block.tasks));
+
+  if (hasRescue) {
+    body.push('');
+    body.push('[rescue]');
+    body.push(...renderNodeTree(block.rescue));
+  }
+
+  if (hasAlways) {
+    body.push('');
+    body.push('[always]');
+    body.push(...renderNodeTree(block.always));
+  }
+
+  return [makeFlowBox(boxLines, body)];
 }
 
 function buildIncludeBlock(node: IncludeNode): FlowBlock[] {
   const target = node.file ?? node.role ?? '?';
-  return [makeFlowBox([`[${node.type}] ${target}`])];
+  const lines = [`[${node.type}] ${target}`];
+
+  if (node.when) {
+    const whenStr = Array.isArray(node.when) ? node.when.join(' and ') : node.when;
+    lines.push(`when: ${whenStr}`);
+  }
+
+  return [makeFlowBox(lines)];
 }
 
 // ─── Box rendering ──────────────────────────────────────────────────────────
@@ -244,8 +333,10 @@ function wrapLine(text: string, maxWidth: number): string[] {
   return result;
 }
 
-function makeFlowBox(contentLines: string[]): BoxBlock {
-  const wrapped = contentLines.flatMap(l => wrapLine(l, BOX_MAX_WIDTH));
+function makeFlowBox(contentLines: string[], bodyLines?: string[]): BoxBlock {
+  const headerWrapped = contentLines.flatMap(l => wrapLine(l, BOX_MAX_WIDTH));
+  const bodyWrapped = bodyLines ?? [];
+  const wrapped = [...headerWrapped, ...bodyWrapped];
   const innerWidth = Math.max(BOX_MIN_WIDTH, ...wrapped.map(l => l.length));
   const halfLeft = Math.floor(innerWidth / 2);
   const halfRight = innerWidth - halfLeft;
@@ -254,11 +345,14 @@ function makeFlowBox(contentLines: string[]): BoxBlock {
   const botBorder = '+' + '-'.repeat(halfLeft) + '+' + '-'.repeat(halfRight + 1) + '+';
 
   const lines = [topBorder];
-  for (const line of wrapped) {
+  for (const line of headerWrapped) {
     const pad = innerWidth - line.length;
     const padL = Math.floor(pad / 2);
     const padR = pad - padL;
     lines.push('| ' + ' '.repeat(padL) + line + ' '.repeat(padR) + ' |');
+  }
+  for (const line of bodyWrapped) {
+    lines.push('| ' + line.padEnd(innerWidth) + ' |');
   }
   lines.push(botBorder);
 
