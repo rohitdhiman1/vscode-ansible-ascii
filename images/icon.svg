@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="128" height="128" rx="20" fill="url(#bg)"/>
+
+  <!-- Top box -->
+  <rect x="34" y="14" width="60" height="22" rx="3" fill="none" stroke="#e74c3c" stroke-width="2.5"/>
+  <text x="64" y="29" text-anchor="middle" fill="#e74c3c" font-family="monospace" font-size="11" font-weight="bold">PLAY</text>
+
+  <!-- Connector 1 -->
+  <line x1="64" y1="36" x2="64" y2="48" stroke="#8be9fd" stroke-width="2"/>
+  <polygon points="60,46 64,52 68,46" fill="#8be9fd"/>
+
+  <!-- Middle box -->
+  <rect x="24" y="52" width="80" height="22" rx="3" fill="none" stroke="#50fa7b" stroke-width="2.5"/>
+  <text x="64" y="67" text-anchor="middle" fill="#50fa7b" font-family="monospace" font-size="10" font-weight="bold">tasks</text>
+
+  <!-- Connector 2 -->
+  <line x1="64" y1="74" x2="64" y2="86" stroke="#8be9fd" stroke-width="2"/>
+  <polygon points="60,84 64,90 68,84" fill="#8be9fd"/>
+
+  <!-- Bottom box with tree -->
+  <rect x="24" y="90" width="80" height="26" rx="3" fill="none" stroke="#bd93f9" stroke-width="2.5"/>
+  <text x="38" y="101" fill="#f8f8f2" font-family="monospace" font-size="8">+-</text>
+  <text x="50" y="101" fill="#bd93f9" font-family="monospace" font-size="8">block</text>
+  <text x="38" y="112" fill="#f8f8f2" font-family="monospace" font-size="8">+-</text>
+  <text x="50" y="112" fill="#bd93f9" font-family="monospace" font-size="8">rescue</text>
+
+  <!-- ASCII accent: + corners hint -->
+  <text x="22" y="62" fill="#6272a4" font-family="monospace" font-size="8">+</text>
+  <text x="100" y="62" fill="#6272a4" font-family="monospace" font-size="8">+</text>
+</svg>
