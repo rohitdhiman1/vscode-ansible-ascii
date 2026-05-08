@@ -1,0 +1,393 @@
+---
+# Play 1 — Provision & Harden Web Tier
+- hosts: webservers
+  name: Provision & Harden Web Tier
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install base packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - wget
+        - unzip
+        - jq
+        - htop
+
+  roles:
+    - common
+    - security-hardening
+    - nginx
+    - role: monitoring
+      when: enable_monitoring | default(true)
+
+  tasks:
+    - name: Create app user
+      user:
+        name: appuser
+        shell: /bin/bash
+        groups: www-data
+        append: yes
+
+    - name: Clone application repo
+      git:
+        repo: https://github.com/acme/webapp.git
+        dest: /opt/webapp
+        version: "{{ app_version }}"
+      register: git_result
+
+    - name: Install Python dependencies
+      pip:
+        requirements: /opt/webapp/requirements.txt
+        virtualenv: /opt/webapp/venv
+      when: git_result.changed
+
+    - name: Upload app config
+      template:
+        src: templates/app.conf.j2
+        dest: /opt/webapp/config.yml
+      notify: Restart webapp
+
+    - block:
+        - name: Run database migrations
+          shell: "cd /opt/webapp && ./manage.py migrate --noinput"
+          changed_when: false
+
+        - name: Collect static files
+          shell: "cd /opt/webapp && ./manage.py collectstatic --noinput"
+          changed_when: false
+
+        - name: Validate config
+          command: "/opt/webapp/manage.py check --deploy"
+          changed_when: false
+      rescue:
+        - name: Rollback migrations
+          shell: "cd /opt/webapp && ./manage.py migrate --fake {{ previous_migration }}"
+          changed_when: false
+
+        - name: Send failure alert
+          uri:
+            url: "https://hooks.slack.com/services/T00/B00/xxx"
+            method: POST
+            body: '{"text": "Deploy failed on {{ inventory_hostname }}"}'
+            body_format: json
+      always:
+        - name: Log deployment result
+          lineinfile:
+            path: /var/log/deploys.log
+            line: "{{ ansible_date_time.iso8601 }} - deploy completed"
+
+    - name: Configure nginx vhost
+      template:
+        src: templates/vhost.conf.j2
+        dest: /etc/nginx/sites-available/webapp.conf
+      notify: Reload nginx
+
+    - name: Enable nginx vhost
+      file:
+        src: /etc/nginx/sites-available/webapp.conf
+        dest: /etc/nginx/sites-enabled/webapp.conf
+        state: link
+      notify: Reload nginx
+
+    - name: Remove default nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Configure UFW firewall
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "80"
+        - "443"
+        - "22"
+
+    - block:
+        - name: Request SSL certificate
+          command: "certbot certonly --nginx -d {{ domain_name }} --non-interactive --agree-tos -m admin@{{ domain_name }}"
+          changed_when: false
+
+        - name: Setup SSL renewal cron
+          cron:
+            name: certbot-renew
+            minute: "0"
+            hour: "3"
+            job: "certbot renew --quiet"
+      when: enable_ssl | default(false)
+
+    - name: Start webapp service
+      service:
+        name: webapp
+        state: started
+        enabled: yes
+
+    - import_tasks: tasks/logrotate.yml
+
+    - include_tasks: tasks/monitoring-agent.yml
+      when: enable_monitoring | default(true)
+
+  handlers:
+    - name: Reload nginx
+      service:
+        name: nginx
+        state: reloaded
+
+    - name: Restart webapp
+      service:
+        name: webapp
+        state: restarted
+
+  post_tasks:
+    - name: Health check
+      uri:
+        url: "http://localhost/health"
+        status_code: 200
+      register: health
+      retries: 5
+      delay: 3
+
+    - name: Verify SSL
+      uri:
+        url: "https://{{ domain_name }}/health"
+        validate_certs: yes
+      when: enable_ssl | default(false)
+
+# Play 2 — Configure Database Tier
+- hosts: dbservers
+  name: Configure Database Tier
+  become: yes
+
+  tasks:
+    - name: Install PostgreSQL
+      apt:
+        name: postgresql-15
+        state: present
+
+    - name: Configure pg_hba
+      template:
+        src: templates/pg_hba.conf.j2
+        dest: /etc/postgresql/15/main/pg_hba.conf
+      notify: Restart PostgreSQL
+
+    - name: Tune PostgreSQL config
+      lineinfile:
+        path: /etc/postgresql/15/main/postgresql.conf
+        regexp: "{{ item.key }}"
+        line: "{{ item.key }} = {{ item.value }}"
+      loop:
+        - { key: shared_buffers, value: 256MB }
+        - { key: work_mem, value: 64MB }
+        - { key: max_connections, value: 200 }
+      notify: Restart PostgreSQL
+
+    - name: Create app database
+      community.postgresql.postgresql_db:
+        name: webapp_db
+        encoding: UTF-8
+
+    - name: Create app DB user
+      community.postgresql.postgresql_user:
+        db: webapp_db
+        name: webapp_user
+        password: "{{ db_password }}"
+        priv: ALL
+
+    - name: Enable pg extensions
+      community.postgresql.postgresql_ext:
+        name: "{{ item }}"
+        db: webapp_db
+      loop:
+        - pgcrypto
+        - uuid-ossp
+
+    - name: Setup daily backup cron
+      cron:
+        name: pg-daily-backup
+        minute: "0"
+        hour: "2"
+        job: "pg_dump webapp_db | gzip > /backups/webapp_$(date +\\%F).sql.gz"
+
+    - name: Verify DB connectivity
+      community.postgresql.postgresql_ping:
+        db: webapp_db
+        login_user: webapp_user
+        login_password: "{{ db_password }}"
+      register: db_ping
+
+    - name: Log DB status
+      debug:
+        msg: "Database {{ db_ping.server_version }} is healthy"
+
+  handlers:
+    - name: Restart PostgreSQL
+      service:
+        name: postgresql
+        state: restarted
+
+# Play 3 — Configure Cache Tier
+- hosts: cacheservers
+  name: Configure Cache Tier
+  become: yes
+
+  tasks:
+    - name: Install Redis
+      apt:
+        name: redis-server
+        state: present
+
+    - name: Configure Redis
+      template:
+        src: templates/redis.conf.j2
+        dest: /etc/redis/redis.conf
+      notify: Restart Redis
+
+    - name: Set Redis memory limit
+      lineinfile:
+        path: /etc/redis/redis.conf
+        regexp: "^maxmemory "
+        line: "maxmemory {{ redis_maxmemory | default('512mb') }}"
+      notify: Restart Redis
+
+    - name: Enable Redis service
+      service:
+        name: redis-server
+        state: started
+        enabled: yes
+
+    - name: Verify Redis is responding
+      command: redis-cli ping
+      register: redis_ping
+      changed_when: false
+
+  handlers:
+    - name: Restart Redis
+      service:
+        name: redis-server
+        state: restarted
+
+# Play 4 — Configure Load Balancer
+- hosts: loadbalancers
+  name: Configure Load Balancer
+  become: yes
+
+  tasks:
+    - name: Install HAProxy
+      apt:
+        name: haproxy
+        state: present
+
+    - name: Deploy HAProxy config
+      template:
+        src: templates/haproxy.cfg.j2
+        dest: /etc/haproxy/haproxy.cfg
+      notify: Reload HAProxy
+
+    - name: Configure HAProxy logging
+      copy:
+        src: files/haproxy-rsyslog.conf
+        dest: /etc/rsyslog.d/49-haproxy.conf
+      notify: Restart rsyslog
+
+    - name: Enable HAProxy
+      service:
+        name: haproxy
+        state: started
+        enabled: yes
+
+    - block:
+        - name: Install keepalived
+          apt:
+            name: keepalived
+            state: present
+
+        - name: Configure keepalived
+          template:
+            src: templates/keepalived.conf.j2
+            dest: /etc/keepalived/keepalived.conf
+          notify: Restart keepalived
+
+        - name: Start keepalived
+          service:
+            name: keepalived
+            state: started
+            enabled: yes
+      when: ha_enabled | default(false)
+
+    - name: Open LB ports
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "80"
+        - "443"
+        - "8404"
+
+  handlers:
+    - name: Reload HAProxy
+      service:
+        name: haproxy
+        state: reloaded
+
+    - name: Restart rsyslog
+      service:
+        name: rsyslog
+        state: restarted
+
+    - name: Restart keepalived
+      service:
+        name: keepalived
+        state: restarted
+
+# Play 5 — Smoke Tests (from control node)
+- hosts: localhost
+  name: Run Smoke Tests
+  connection: local
+  gather_facts: no
+
+  tasks:
+    - name: Wait for web tier
+      uri:
+        url: "http://{{ groups['loadbalancers'][0] }}/health"
+        status_code: 200
+      retries: 10
+      delay: 5
+      register: smoke_web
+
+    - name: Test API endpoint
+      uri:
+        url: "http://{{ groups['loadbalancers'][0] }}/api/v1/status"
+        return_content: yes
+      register: api_result
+
+    - name: Verify API response
+      assert:
+        that:
+          - api_result.status == 200
+          - "'healthy' in api_result.content"
+
+    - name: Send deploy success notification
+      uri:
+        url: "https://hooks.slack.com/services/T00/B00/xxx"
+        method: POST
+        body: '{"text": "Deploy successful — all smoke tests passed"}'
+        body_format: json
+      delegate_to: localhost
+
+  post_tasks:
+    - name: Generate deploy report
+      template:
+        src: templates/deploy-report.md.j2
+        dest: "/tmp/deploy-report-{{ ansible_date_time.date }}.md"
+      delegate_to: localhost
