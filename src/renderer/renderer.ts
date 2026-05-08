@@ -7,17 +7,6 @@ const BOX_MIN_WIDTH = 20;
 const BOX_MAX_WIDTH = 60;
 const HORIZONTAL_BRANCH_THRESHOLD = 6;
 
-const SKIP_ARGS = new Set([
-  'changed_when', 'failed_when', 'no_log', 'ignore_errors',
-  'retries', 'delay', 'until', 'async', 'poll',
-  'environment', 'vars', 'args', 'timeout',
-]);
-
-const SENSITIVE_ARGS = new Set([
-  'password', 'login_password', 'secret', 'token',
-  'api_key', 'private_key', 'secret_key',
-]);
-
 export interface RendererOptions {
   showSummary: boolean;
 }
@@ -62,7 +51,12 @@ interface SeparatorBlock {
   type: 'separator';
 }
 
-type FlowBlock = BoxBlock | ConnectorBlock | SeparatorBlock;
+interface BranchBlock {
+  type: 'branch';
+  branches: { label: string; blocks: FlowBlock[] }[];
+}
+
+type FlowBlock = BoxBlock | ConnectorBlock | SeparatorBlock | BranchBlock;
 
 // ─── Build flow blocks from AST ─────────────────────────────────────────────
 
@@ -123,6 +117,22 @@ function arg(args: unknown, key: string): string | undefined {
   if (!args || typeof args !== 'object') return undefined;
   const v = (args as Record<string, unknown>)[key];
   return v == null ? undefined : String(v);
+}
+
+const SKIP_ARGS = new Set([
+  'changed_when', 'failed_when', 'no_log', 'ignore_errors',
+  'retries', 'delay', 'until', 'async', 'poll',
+  'environment', 'vars', 'args', 'timeout',
+]);
+
+const SENSITIVE_ARGS = new Set([
+  'password', 'login_password', 'secret', 'token',
+  'api_key', 'private_key', 'secret_key',
+]);
+
+function shortModule(module: string): string {
+  const parts = module.split('.');
+  return parts[parts.length - 1];
 }
 
 function describeOperation(module: string, args: unknown): string[] {
@@ -190,11 +200,6 @@ function describeOperation(module: string, args: unknown): string[] {
     }
   }
   return result;
-}
-
-function shortModule(module: string): string {
-  const parts = module.split('.');
-  return parts[parts.length - 1];
 }
 
 function describeTask(task: TaskNode): string {
@@ -365,6 +370,7 @@ function buildRoleBox(label: string, roles: RoleRef[]): BoxBlock {
   return makeFlowBox([label], body);
 }
 
+
 // ─── Box rendering ──────────────────────────────────────────────────────────
 
 function wrapLine(text: string, maxWidth: number): string[] {
@@ -391,6 +397,7 @@ function makeFlowBox(contentLines: string[], bodyLines?: string[]): BoxBlock {
   const headerWrapped = contentLines.flatMap(l => wrapLine(l, BOX_MAX_WIDTH));
   const bodyWrapped = bodyLines ?? [];
   const wrapped = [...headerWrapped, ...bodyWrapped];
+
   const innerWidth = Math.max(BOX_MIN_WIDTH, ...wrapped.map(l => l.length));
   const halfLeft = Math.floor(innerWidth / 2);
   const halfRight = innerWidth - halfLeft;
@@ -441,10 +448,18 @@ function layoutVertical(blocks: FlowBlock[]): string[] {
 
     if (block.type === 'box') {
       groups.push({ lines: block.lines, center: centerColumn(block) });
+    } else if (block.type === 'branch') {
+      const branchLines = layoutBranch(block);
+      const w = Math.max(...branchLines.map(l => l.length));
+      groups.push({ lines: branchLines, center: Math.floor(w / 2) });
     }
   }
 
   const maxCenter = Math.max(...groups.map(g => g.center));
+  const maxRight = Math.max(...groups.map(g => {
+    const w = Math.max(...g.lines.map(l => l.length));
+    return (maxCenter - g.center) + w;
+  }));
 
   const lines: string[] = [];
   for (const group of groups) {
@@ -455,6 +470,84 @@ function layoutVertical(blocks: FlowBlock[]): string[] {
   }
 
   return lines;
+}
+
+function layoutBranch(branch: BranchBlock): string[] {
+  const columnRendered: string[][] = [];
+  const columnWidths: number[] = [];
+
+  for (const b of branch.branches) {
+    const colLines = layoutVertical(b.blocks);
+    const labelBox = makeFlowBox([b.label]);
+    const allLines = [...labelBox.lines, '|', 'v', ...colLines];
+    const w = Math.max(...allLines.map(l => l.length));
+    columnRendered.push(allLines);
+    columnWidths.push(w);
+  }
+
+  const gap = 4;
+  const totalWidth = columnWidths.reduce((a, b) => a + b, 0) + gap * (columnWidths.length - 1);
+  const maxHeight = Math.max(...columnRendered.map(c => c.length));
+
+  for (const col of columnRendered) {
+    while (col.length < maxHeight) col.push('');
+  }
+
+  const centers: number[] = [];
+  let offset = 0;
+  for (let i = 0; i < columnWidths.length; i++) {
+    centers.push(offset + Math.floor(columnWidths[i] / 2));
+    offset += columnWidths[i] + gap;
+  }
+
+  const branchHeaderLine = buildBranchLine(centers, totalWidth);
+
+  const result: string[] = [branchHeaderLine];
+
+  for (let row = 0; row < maxHeight; row++) {
+    let line = '';
+    for (let col = 0; col < columnRendered.length; col++) {
+      const cellContent = columnRendered[col][row];
+      const contentLen = cellContent.length;
+      const padLeft = Math.floor((columnWidths[col] - contentLen) / 2);
+      const padRight = columnWidths[col] - contentLen - padLeft;
+      const centered = ' '.repeat(padLeft) + cellContent + ' '.repeat(padRight);
+
+      if (col > 0) line += ' '.repeat(gap);
+      line += centered;
+    }
+    result.push(line);
+  }
+
+  return result;
+}
+
+function buildBranchLine(centers: number[], totalWidth: number): string {
+  const chars = new Array(totalWidth).fill(' ');
+  const first = centers[0];
+  const last = centers[centers.length - 1];
+
+  for (let i = first; i <= last; i++) {
+    chars[i] = '-';
+  }
+  for (const c of centers) {
+    chars[c] = '+';
+  }
+
+  return chars.join('');
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function countBoxes(blocks: FlowBlock[]): number {
+  let n = 0;
+  for (const b of blocks) {
+    if (b.type === 'box') n++;
+    if (b.type === 'branch') {
+      for (const br of b.branches) n += countBoxes(br.blocks);
+    }
+  }
+  return n;
 }
 
 // ─── Summary ────────────────────────────────────────────────────────────────
