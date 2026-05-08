@@ -2,7 +2,7 @@
   "name": "ansible-ascii-visualiser",
   "displayName": "Ansible ASCII Visualiser",
   "description": "Renders Ansible playbooks as ASCII flowchart diagrams",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "rohitdhiman",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other"],

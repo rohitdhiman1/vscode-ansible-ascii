@@ -1,38 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1a1a2e"/>
-      <stop offset="100%" style="stop-color:#16213e"/>
+      <stop offset="0%" style="stop-color:#1e1e2e"/>
+      <stop offset="100%" style="stop-color:#181825"/>
     </linearGradient>
   </defs>
 
   <!-- Background -->
-  <rect width="128" height="128" rx="20" fill="url(#bg)"/>
+  <rect width="256" height="256" rx="0" fill="url(#bg)"/>
 
-  <!-- Top box -->
-  <rect x="34" y="14" width="60" height="22" rx="3" fill="none" stroke="#e74c3c" stroke-width="2.5"/>
-  <text x="64" y="29" text-anchor="middle" fill="#e74c3c" font-family="monospace" font-size="11" font-weight="bold">PLAY</text>
+  <!-- Top box: PLAY -->
+  <rect x="58" y="22" width="140" height="44" rx="6" fill="#e74c3c" fill-opacity="0.15" stroke="#e74c3c" stroke-width="3.5"/>
+  <text x="128" y="51" text-anchor="middle" fill="#e74c3c" font-family="monospace, Courier" font-size="22" font-weight="bold">PLAY</text>
 
   <!-- Connector 1 -->
-  <line x1="64" y1="36" x2="64" y2="48" stroke="#8be9fd" stroke-width="2"/>
-  <polygon points="60,46 64,52 68,46" fill="#8be9fd"/>
+  <line x1="128" y1="66" x2="128" y2="88" stroke="#89b4fa" stroke-width="3"/>
+  <polygon points="122,84 128,94 134,84" fill="#89b4fa"/>
 
-  <!-- Middle box -->
-  <rect x="24" y="52" width="80" height="22" rx="3" fill="none" stroke="#50fa7b" stroke-width="2.5"/>
-  <text x="64" y="67" text-anchor="middle" fill="#50fa7b" font-family="monospace" font-size="10" font-weight="bold">tasks</text>
+  <!-- Middle box: tasks -->
+  <rect x="38" y="94" width="180" height="44" rx="6" fill="#50fa7b" fill-opacity="0.12" stroke="#50fa7b" stroke-width="3.5"/>
+  <text x="128" y="123" text-anchor="middle" fill="#50fa7b" font-family="monospace, Courier" font-size="20" font-weight="bold">tasks</text>
 
   <!-- Connector 2 -->
-  <line x1="64" y1="74" x2="64" y2="86" stroke="#8be9fd" stroke-width="2"/>
-  <polygon points="60,84 64,90 68,84" fill="#8be9fd"/>
+  <line x1="128" y1="138" x2="128" y2="160" stroke="#89b4fa" stroke-width="3"/>
+  <polygon points="122,156 128,166 134,156" fill="#89b4fa"/>
 
-  <!-- Bottom box with tree -->
-  <rect x="24" y="90" width="80" height="26" rx="3" fill="none" stroke="#bd93f9" stroke-width="2.5"/>
-  <text x="38" y="101" fill="#f8f8f2" font-family="monospace" font-size="8">+-</text>
-  <text x="50" y="101" fill="#bd93f9" font-family="monospace" font-size="8">block</text>
-  <text x="38" y="112" fill="#f8f8f2" font-family="monospace" font-size="8">+-</text>
-  <text x="50" y="112" fill="#bd93f9" font-family="monospace" font-size="8">rescue</text>
+  <!-- Bottom box: block with tree lines -->
+  <rect x="28" y="166" width="200" height="68" rx="6" fill="#cba6f7" fill-opacity="0.12" stroke="#cba6f7" stroke-width="3.5"/>
 
-  <!-- ASCII accent: + corners hint -->
-  <text x="22" y="62" fill="#6272a4" font-family="monospace" font-size="8">+</text>
-  <text x="100" y="62" fill="#6272a4" font-family="monospace" font-size="8">+</text>
+  <!-- Tree: block header -->
+  <text x="50" y="190" fill="#cba6f7" font-family="monospace, Courier" font-size="16" font-weight="bold">[block]</text>
+
+  <!-- Tree lines -->
+  <text x="50" y="212" fill="#89b4fa" font-family="monospace, Courier" font-size="15">|</text>
+  <text x="50" y="226" fill="#89b4fa" font-family="monospace, Courier" font-size="14">+-</text>
+  <text x="72" y="226" fill="#f8f8f2" font-family="monospace, Courier" font-size="14">rescue</text>
+
+  <!-- Tree: task inside block -->
+  <text x="130" y="190" fill="#89b4fa" font-family="monospace, Courier" font-size="14">+-</text>
+  <text x="152" y="190" fill="#f8f8f2" font-family="monospace, Courier" font-size="14">apt</text>
+  <text x="130" y="210" fill="#89b4fa" font-family="monospace, Courier" font-size="14">+-</text>
+  <text x="152" y="210" fill="#f8f8f2" font-family="monospace, Courier" font-size="14">shell</text>
+  <text x="130" y="226" fill="#89b4fa" font-family="monospace, Courier" font-size="14">+-</text>
+  <text x="152" y="226" fill="#f8f8f2" font-family="monospace, Courier" font-size="14">copy</text>
 </svg>
