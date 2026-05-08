@@ -26,6 +26,11 @@ export function render(file: AnsibleFile, options: RendererOptions): string {
   }
 
   const lines = layoutVertical(blocks);
+
+  if (options.showSummary) {
+    appendSummary(file, lines);
+  }
+
   return lines.join('\n');
 }
 
@@ -227,6 +232,7 @@ function buildTaskBlock(task: TaskNode): FlowBlock[] {
       lines.push('loop');
     }
   }
+  if (task.delegateTo) lines.push(`delegate_to: ${task.delegateTo}`);
   if (task.notify?.length) lines.push(`--> notify: ${task.notify.join(', ')}`);
 
   return [makeFlowBox(lines)];
@@ -448,4 +454,43 @@ function layoutVertical(blocks: FlowBlock[]): string[] {
   }
 
   return lines;
+}
+
+// ─── Summary ────────────────────────────────────────────────────────────────
+
+interface Stats {
+  tasks: number; handlers: number; roles: number; variables: number;
+}
+
+function appendSummary(file: AnsibleFile, lines: string[]): void {
+  const s: Stats = { tasks: 0, handlers: 0, roles: 0, variables: 0 };
+
+  function walk(nodes: AnsibleNode[]): void {
+    for (const node of nodes) {
+      if (node.kind === 'task') { s.tasks++; if (node.register) s.variables++; }
+      if (node.kind === 'include') s.tasks++;
+      if (node.kind === 'block') walk([...node.tasks, ...node.rescue, ...node.always]);
+    }
+  }
+
+  if (file.type === 'playbook' && file.plays) {
+    for (const play of file.plays) {
+      walk([...play.preTasks, ...play.tasks, ...play.postTasks]);
+      s.handlers += play.handlers.length;
+      s.roles += play.roles.length;
+    }
+  } else if (file.tasks) {
+    walk(file.tasks);
+  }
+
+  const diagramWidth = Math.max(...lines.map(l => l.length));
+  const statsLine = `Tasks: ${s.tasks} | Handlers: ${s.handlers} | Roles: ${s.roles} | Variables: ${s.variables}`;
+  const separatorLen = Math.max(statsLine.length, Math.min(diagramWidth, 52));
+  const summaryLine = '─── Summary ' + '─'.repeat(Math.max(0, separatorLen - 12));
+  const sumPad = Math.max(0, Math.floor((diagramWidth - summaryLine.length) / 2));
+  const statPad = Math.max(0, Math.floor((diagramWidth - statsLine.length) / 2));
+
+  lines.push('');
+  lines.push(' '.repeat(sumPad) + summaryLine);
+  lines.push(' '.repeat(statPad) + statsLine);
 }
