@@ -123,13 +123,28 @@ function describeOperation(module: string, args: unknown): string[] {
   return result;
 }
 
+function shortModule(module: string): string {
+  const parts = module.split('.');
+  return parts[parts.length - 1];
+}
+
+function describeTask(task: TaskNode): string {
+  if (task.name) return task.name;
+  if (task.module && task.moduleArgs) {
+    const details = describeOperation(task.module, task.moduleArgs);
+    if (details.length > 0) return details[0];
+  }
+  if (task.module) return task.module;
+  return '(task)';
+}
+
 function buildTaskBlock(task: TaskNode): FlowBlock[] {
-  const name = task.name ?? '(task)';
+  const name = describeTask(task);
   const lines: string[] = [name];
 
   if (task.module) {
     const details = task.name ? describeOperation(task.module, task.moduleArgs) : [];
-    lines.push(`[${task.module}]`);
+    lines.push(`[${shortModule(task.module)}]`);
     for (const d of details) lines.push(d);
   }
   if (task.when) {
