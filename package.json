@@ -1,0 +1,81 @@
+{
+  "name": "ansible-ascii-visualiser",
+  "displayName": "Ansible ASCII Visualiser",
+  "description": "Renders Ansible playbooks as ASCII flowchart diagrams",
+  "version": "0.1.0",
+  "publisher": "rohitdhiman",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "license": "MIT",
+  "keywords": ["ansible", "yaml", "playbook", "visualiser", "ascii"],
+  "activationEvents": ["onLanguage:yaml"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ansibleVisualiser.showTree",
+        "title": "Ansible Visualiser: Show Tree"
+      },
+{
+        "command": "ansibleVisualiser.refresh",
+        "title": "Ansible Visualiser: Refresh"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "ansibleVisualiser.showTree",
+          "when": "resourceExtname == .yml || resourceExtname == .yaml",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "ansibleVisualiser.showTree",
+          "when": "resourceExtname == .yml || resourceExtname == .yaml",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Ansible Visualiser",
+      "properties": {
+"ansibleVisualiser.showSummary": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the summary footer below the tree"
+        },
+        "ansibleVisualiser.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-refresh the tree when the source file is saved"
+        },
+        "ansibleVisualiser.includeDepth": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 5,
+          "description": "Max depth to follow include_tasks/import_tasks (0 = don't follow)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run bundle",
+    "compile": "tsc --noEmit",
+    "bundle": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "yaml": "^2.3.4"
+  }
+}
