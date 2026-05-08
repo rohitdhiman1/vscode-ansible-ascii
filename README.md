@@ -1,6 +1,15 @@
 # Ansible ASCII Visualiser
 
-A VS Code extension that renders Ansible YAML playbooks as ASCII flowchart diagrams — right inside your editor.
+[![Version](https://img.shields.io/visual-studio-marketplace/v/rohitdhiman.ansible-ascii-visualiser?label=VS%20Code%20Marketplace&color=blue)](https://marketplace.visualstudio.com/items?itemName=rohitdhiman.ansible-ascii-visualiser)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/rohitdhiman.ansible-ascii-visualiser?color=green)](https://marketplace.visualstudio.com/items?itemName=rohitdhiman.ansible-ascii-visualiser)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Vulnerabilities](https://img.shields.io/badge/vulnerabilities-0-brightgreen)](https://www.npmjs.com/package/ansible-ascii-visualiser)
+[![No Dependencies](https://img.shields.io/badge/runtime%20deps-1%20(yaml)-brightgreen)]()
+[![Offline](https://img.shields.io/badge/network-offline%20only-blue)]()
+
+Stop burning AI tokens asking ChatGPT to "turn my playbook into a flowchart." This extension does it in one click — instantly, offline, and for free.
+
+A VS Code extension that renders Ansible YAML playbooks as ASCII flowchart diagrams — right inside your editor. No API keys, no waiting, no copy-pasting YAML into a chat window.
 
 ## What it does
 
@@ -59,11 +68,19 @@ Open any Ansible playbook or task file and get an instant ASCII flowchart showin
 ## Usage
 
 1. Open an Ansible YAML file (`.yml` / `.yaml`)
-2. Run **Ansible Visualiser: Show Tree** from:
-   - Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`)
-   - Right-click context menu (editor or explorer)
+2. Click the **flowchart icon** in the editor title bar (top-right), or:
+   - Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) → **Ansible Visualiser: Show Tree**
+   - Right-click in the editor or explorer → **Ansible Visualiser: Show Tree**
 3. The ASCII flowchart opens in a side panel
 4. Edit your playbook — the diagram auto-refreshes on save
+
+### Works with any YAML setup
+
+| Your setup | What happens |
+|---|---|
+| **Red Hat Ansible extension installed** | Files detected as `ansible` get the title bar icon and render immediately |
+| **No Ansible extension** | The icon still appears on all `.yml`/`.yaml` files. The extension scans for Ansible markers (`hosts:`, `tasks:`, `roles:`, etc.) and renders automatically if found |
+| **Non-Ansible YAML** (Kubernetes, Docker Compose, etc.) | You'll get a quick prompt asking if you want to render anyway — no accidental flowcharts |
 
 ## Settings
 

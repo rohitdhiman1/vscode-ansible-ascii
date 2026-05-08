@@ -28,7 +28,7 @@ async function showTree(): Promise<void> {
     return;
   }
 
-  if (!isLikelyAnsible(editor.document)) {
+  if (editor.document.languageId !== 'ansible' && !isLikelyAnsible(editor.document)) {
     const answer = await vscode.window.showWarningMessage(
       'This file does not appear to be an Ansible playbook or task file. Show tree anyway?',
       'Yes', 'No',

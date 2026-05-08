@@ -8,20 +8,33 @@
   "categories": ["Other"],
   "license": "MIT",
   "keywords": ["ansible", "yaml", "playbook", "visualiser", "ascii"],
-  "activationEvents": ["onLanguage:yaml"],
+  "activationEvents": ["onLanguage:yaml", "onLanguage:ansible"],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "ansibleVisualiser.showTree",
-        "title": "Ansible Visualiser: Show Tree"
+        "title": "Ansible Visualiser: Show Tree",
+        "icon": "$(type-hierarchy)"
       },
-{
+      {
         "command": "ansibleVisualiser.refresh",
         "title": "Ansible Visualiser: Refresh"
       }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "ansibleVisualiser.showTree",
+          "when": "editorLangId == ansible",
+          "group": "navigation"
+        },
+        {
+          "command": "ansibleVisualiser.showTree",
+          "when": "editorLangId == yaml && resourceExtname == .yml || editorLangId == yaml && resourceExtname == .yaml",
+          "group": "navigation"
+        }
+      ],
       "editor/context": [
         {
           "command": "ansibleVisualiser.showTree",
@@ -71,9 +84,9 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
-    "esbuild": "^0.20.0",
+    "esbuild": "^0.25.0",
     "typescript": "^5.3.0",
-    "vitest": "^1.0.0"
+    "vitest": "^3.2.0"
   },
   "dependencies": {
     "yaml": "^2.3.4"
