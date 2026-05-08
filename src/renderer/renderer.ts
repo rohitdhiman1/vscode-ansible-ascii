@@ -115,10 +115,26 @@ function describeOperation(module: string, args: unknown): string[] {
     if (msg) return [`"${msg}"`];
   }
 
+  const SKIP_ARGS = new Set([
+    'changed_when', 'failed_when', 'no_log', 'ignore_errors',
+    'retries', 'delay', 'until', 'async', 'poll',
+    'environment', 'vars', 'args', 'timeout',
+  ]);
+
+  const SENSITIVE_ARGS = new Set([
+    'password', 'login_password', 'secret', 'token',
+    'api_key', 'private_key', 'secret_key',
+  ]);
+
   const result: string[] = [];
   for (const [k, v] of Object.entries(args as Record<string, unknown>)) {
+    if (SKIP_ARGS.has(k)) continue;
     if (k === 'state' && v === 'present') continue;
-    result.push(`${k}: ${String(v)}`);
+    if (SENSITIVE_ARGS.has(k)) {
+      result.push(`${k}: ****`);
+    } else {
+      result.push(`${k}: ${String(v)}`);
+    }
   }
   return result;
 }
