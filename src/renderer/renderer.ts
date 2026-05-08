@@ -126,12 +126,39 @@ function describeOperation(module: string, args: unknown): string[] {
     'api_key', 'private_key', 'secret_key',
   ]);
 
+  const entries = Object.entries(args as Record<string, unknown>)
+    .filter(([k, v]) => {
+      if (SKIP_ARGS.has(k)) return false;
+      if (k === 'state' && v === 'present') return false;
+      const s = String(v);
+      if (s.includes('{{ item }}') || s === '{{ item }}') return false;
+      return true;
+    });
+  const argsMap = args as Record<string, unknown>;
+  if (argsMap.state && argsMap.enabled !== undefined) {
+    const result: string[] = [];
+    const enabledStr = argsMap.enabled ? 'enabled' : 'disabled';
+    for (const [k, v] of entries) {
+      if (k === 'enabled') continue;
+      if (k === 'state') {
+        result.push(`${String(v)} + ${enabledStr}`);
+      } else if (SENSITIVE_ARGS.has(k)) {
+        result.push(`${k}: ****`);
+      } else if (Array.isArray(v)) {
+        for (const item of v) result.push(`- ${String(item)}`);
+      } else {
+        result.push(`${k}: ${String(v)}`);
+      }
+    }
+    return result;
+  }
+
   const result: string[] = [];
-  for (const [k, v] of Object.entries(args as Record<string, unknown>)) {
-    if (SKIP_ARGS.has(k)) continue;
-    if (k === 'state' && v === 'present') continue;
+  for (const [k, v] of entries) {
     if (SENSITIVE_ARGS.has(k)) {
       result.push(`${k}: ****`);
+    } else if (Array.isArray(v)) {
+      for (const item of v) result.push(`- ${String(item)}`);
     } else {
       result.push(`${k}: ${String(v)}`);
     }
@@ -168,7 +195,18 @@ function buildTaskBlock(task: TaskNode): FlowBlock[] {
     lines.push(`when: ${whenStr}`);
   }
   if (task.register) lines.push(`register: ${task.register}`);
-  if (task.loop !== undefined) lines.push('loop');
+  if (task.loop !== undefined) {
+    if (Array.isArray(task.loop)) {
+      const items = task.loop.map(i =>
+        typeof i === 'object' && i !== null ? JSON.stringify(i) : String(i)
+      );
+      lines.push(`loop: [${items.join(', ')}]`);
+    } else if (typeof task.loop === 'string') {
+      lines.push(`loop: ${task.loop}`);
+    } else {
+      lines.push('loop');
+    }
+  }
   if (task.notify?.length) lines.push(`--> notify: ${task.notify.join(', ')}`);
 
   return [makeFlowBox(lines)];
