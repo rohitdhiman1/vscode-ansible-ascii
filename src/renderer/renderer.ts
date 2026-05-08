@@ -82,10 +82,64 @@ function buildNodeBlock(node: AnsibleNode): FlowBlock[] {
   return [];
 }
 
+function arg(args: unknown, key: string): string | undefined {
+  if (!args || typeof args !== 'object') return undefined;
+  const v = (args as Record<string, unknown>)[key];
+  return v == null ? undefined : String(v);
+}
+
+function describeOperation(module: string, args: unknown): string[] {
+  if (typeof args === 'string') return [args];
+  if (!args || typeof args !== 'object') return [];
+
+  if (module === 'shell' || module === 'command' || module === 'raw') {
+    const cmd = arg(args, 'cmd') ?? arg(args, '_raw_params');
+    return cmd ? [cmd] : [];
+  }
+
+  if (module === 'copy' || module === 'template') {
+    const src = arg(args, 'src');
+    const dest = arg(args, 'dest');
+    if (src && dest) return [`${src} → ${dest}`];
+  }
+
+  if (module === 'git') {
+    const repo = arg(args, 'repo');
+    const dest = arg(args, 'dest');
+    if (repo && dest) return [`${repo} → ${dest}`];
+    if (repo) return [repo];
+  }
+
+  if (module === 'debug') {
+    const msg = arg(args, 'msg');
+    if (msg) return [`"${msg}"`];
+  }
+
+  const result: string[] = [];
+  for (const [k, v] of Object.entries(args as Record<string, unknown>)) {
+    if (k === 'state' && v === 'present') continue;
+    result.push(`${k}: ${String(v)}`);
+  }
+  return result;
+}
+
 function buildTaskBlock(task: TaskNode): FlowBlock[] {
   const name = task.name ?? '(task)';
   const lines: string[] = [name];
-  if (task.module) lines.push(`[${task.module}]`);
+
+  if (task.module) {
+    const details = task.name ? describeOperation(task.module, task.moduleArgs) : [];
+    lines.push(`[${task.module}]`);
+    for (const d of details) lines.push(d);
+  }
+  if (task.when) {
+    const whenStr = Array.isArray(task.when) ? task.when.join(' and ') : task.when;
+    lines.push(`when: ${whenStr}`);
+  }
+  if (task.register) lines.push(`register: ${task.register}`);
+  if (task.loop !== undefined) lines.push('loop');
+  if (task.notify?.length) lines.push(`--> notify: ${task.notify.join(', ')}`);
+
   return [makeFlowBox(lines)];
 }
 
