@@ -5,6 +5,18 @@ import type {
 
 const BOX_MIN_WIDTH = 20;
 const BOX_MAX_WIDTH = 60;
+const HORIZONTAL_BRANCH_THRESHOLD = 6;
+
+const SKIP_ARGS = new Set([
+  'changed_when', 'failed_when', 'no_log', 'ignore_errors',
+  'retries', 'delay', 'until', 'async', 'poll',
+  'environment', 'vars', 'args', 'timeout',
+]);
+
+const SENSITIVE_ARGS = new Set([
+  'password', 'login_password', 'secret', 'token',
+  'api_key', 'private_key', 'secret_key',
+]);
 
 export interface RendererOptions {
   showSummary: boolean;
@@ -139,17 +151,6 @@ function describeOperation(module: string, args: unknown): string[] {
     const msg = arg(args, 'msg');
     if (msg) return [`"${msg}"`];
   }
-
-  const SKIP_ARGS = new Set([
-    'changed_when', 'failed_when', 'no_log', 'ignore_errors',
-    'retries', 'delay', 'until', 'async', 'poll',
-    'environment', 'vars', 'args', 'timeout',
-  ]);
-
-  const SENSITIVE_ARGS = new Set([
-    'password', 'login_password', 'secret', 'token',
-    'api_key', 'private_key', 'secret_key',
-  ]);
 
   const entries = Object.entries(args as Record<string, unknown>)
     .filter(([k, v]) => {
