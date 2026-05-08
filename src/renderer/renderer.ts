@@ -56,13 +56,33 @@ function buildPlayBlocks(play: PlayNode): FlowBlock[] {
   const hostsLine = `hosts: ${play.hosts}${play.become ? ' | become: yes' : ''}`;
   blocks.push(makeFlowBox([titleLine, hostsLine]));
 
-  if (play.tasks.length === 0) {
+  type Section =
+    | { label: string; nodes: AnsibleNode[] }
+    | { label: string; handlers: HandlerNode[] }
+    | { label: string; roles: RoleRef[] };
+
+  const sections: Section[] = [];
+  if (play.preTasks.length > 0) sections.push({ label: 'pre_tasks', nodes: play.preTasks });
+  if (play.roles.length > 0)    sections.push({ label: 'roles', roles: play.roles });
+  if (play.tasks.length > 0)    sections.push({ label: 'tasks', nodes: play.tasks });
+  if (play.handlers.length > 0) sections.push({ label: 'handlers', handlers: play.handlers });
+  if (play.postTasks.length > 0) sections.push({ label: 'post_tasks', nodes: play.postTasks });
+
+  if (sections.length === 0) {
     blocks.push(makeFlowBox(['(no tasks)']));
     return blocks;
   }
 
-  blocks.push(makeFlowBox(['tasks']));
-  blocks.push(...buildNodeBlocks(play.tasks));
+  for (const s of sections) {
+    if ('nodes' in s) {
+      blocks.push(makeFlowBox([s.label]));
+      blocks.push(...buildNodeBlocks(s.nodes));
+    } else if ('handlers' in s) {
+      blocks.push(buildHandlerBox(s.label, s.handlers));
+    } else {
+      blocks.push(buildRoleBox(s.label, s.roles));
+    }
+  }
 
   return blocks;
 }
@@ -309,6 +329,33 @@ function buildIncludeBlock(node: IncludeNode): FlowBlock[] {
   }
 
   return [makeFlowBox(lines)];
+}
+
+function buildHandlerBox(label: string, handlers: HandlerNode[]): BoxBlock {
+  const body: string[] = [''];
+  for (let i = 0; i < handlers.length; i++) {
+    const h = handlers[i];
+    const isLast = i === handlers.length - 1;
+    const connector = isLast ? '└─' : '├─';
+    const cont = isLast ? '  ' : '│ ';
+    const mod = h.module ? ` [${shortModule(h.module)}]` : '';
+    if (i > 0) body.push('│');
+    body.push(`${connector} ${h.name}${mod}`);
+  }
+  return makeFlowBox([label], body);
+}
+
+function buildRoleBox(label: string, roles: RoleRef[]): BoxBlock {
+  const body: string[] = [''];
+  for (let i = 0; i < roles.length; i++) {
+    const role = roles[i];
+    const isLast = i === roles.length - 1;
+    const connector = isLast ? '└─' : '├─';
+    const whenPart = role.when ? ` (when: ${role.when})` : '';
+    if (i > 0) body.push('│');
+    body.push(`${connector} ${role.name}${whenPart}`);
+  }
+  return makeFlowBox([label], body);
 }
 
 // ─── Box rendering ──────────────────────────────────────────────────────────
